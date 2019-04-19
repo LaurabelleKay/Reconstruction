@@ -1,0 +1,10 @@
+*.tex
+.vscode
+*.log
+*.pdf
+*.aux
+*.cls
+*.jpg
+*.ppm
+*.tif
+*.pgm
