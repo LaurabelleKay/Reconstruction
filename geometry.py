@@ -22,14 +22,14 @@ def fundamental_matrix(coords1, coords2):
     A = np.zeros((num_features, 9))
 
     # Fill out our equation matrix
-    A[:, 0] = np.transpose(coords1[0,:] * coords2[0,:])
-    A[:, 1] = np.transpose(coords1[1,:] * coords2[0,:])
-    A[:, 2] = np.transpose(coords2[0,:])
-    A[:, 3] = np.transpose(coords1[0,:] * coords1[1,:])
-    A[:, 4] = np.transpose(coords1[1,:] * coords2[1,:])
-    A[:, 5] = np.transpose(coords2[1,:])
-    A[:, 6] = np.transpose(coords1[0,:])
-    A[:, 7] = np.transpose(coords1[1,:])
+    A[:, 0] = np.transpose(coords1[0, :] * coords2[0, :])
+    A[:, 1] = np.transpose(coords1[1, :] * coords2[0, :])
+    A[:, 2] = np.transpose(coords2[0, :])
+    A[:, 3] = np.transpose(coords1[0, :] * coords1[1, :])
+    A[:, 4] = np.transpose(coords1[1, :] * coords2[1, :])
+    A[:, 5] = np.transpose(coords2[1, :])
+    A[:, 6] = np.transpose(coords1[0, :])
+    A[:, 7] = np.transpose(coords1[1, :])
     A[:, 8] = np.ones(num_features)
 
     # Solve for F
@@ -38,14 +38,30 @@ def fundamental_matrix(coords1, coords2):
 
     # The right null space of A is the estimate for F, reshape to be 3 x 3
     F = np.reshape(V[:, 8], (3, 3))
+    U, s, V = svd(F)
 
     # Enforce that F is of rank 2
-    U, s, V = svd(F)
-    s[2] = 0 # Set the 3rd # ! diagonal element to 0
+    s[2] = 0
     S = np.diag(s)
+
     F = np.dot(U, np.dot(S, V))
 
     return F
+
+
+def fundamental_minimise(f, coords1, coords2):
+
+    F = np.asarray([np.transpose(f[0:3]), np.transpose(f[3:6]), [
+                   f[6], -(-f[0]*f[4]+f[6]*f[2]*f[4]+f[3]*f[1]-f[6]*f[1]*f[5])/(-f[3]*f[2]+f[0]*f[5]), 1]])
+    print(F)
+
+    num_features = len(coords1[0])
+
+    err = np.zeros((num_features), 1)
+    for i in range(0, num_features):
+        err[i] = np.dot(coords2[:, i]), np.dot(F, np.transpose(coords1[:, i]))
+
+    return err.flatten()
 
 
 def epipole(F):
@@ -90,6 +106,8 @@ def homography(epi, F):
     return H
 
 # ! Need some way to verify that this works!!
+
+
 def reference_frame(epi, H):
     p = np.sum(np.divide(np.eye(3) - H,
                          np.transpose(np.asarray([epi, epi, epi]))), axis=0)/3
@@ -97,15 +115,16 @@ def reference_frame(epi, H):
     p = p[0:3]
     return p
 
+
 def triangulate(coords1, coords2, P1, P2):
     """Triangulate the 3D points for the features using the projection matrices
-    
+
     Arguments:
         coords1 -- feature coordinates for image 1
         coords2 -- feature coordinates for image 2
         P1 -- projection matrix for view 1
         P2 -- projection matrix for view 2
-    
+
     Returns:
         coords3D -- The 3D coordinates for this pair of views
     """
@@ -117,7 +136,7 @@ def triangulate(coords1, coords2, P1, P2):
             (P1[2, :] * coords1[0, i] - P1[0, :]),
             (P1[2, :] * coords1[1, i] - P1[1, :]),
             (P2[2, :] * coords2[0, i] - P2[0, :]),
-            (P2[2, :] * coords2[1, i] - P2[0, :])
+            (P2[2, :] * coords2[1, i] - P2[1, :])
         ])
 
         # For a 3D point X, x1 = P1 * X and x2 = P2 * x, to find X, solve for AX = 0
@@ -128,6 +147,25 @@ def triangulate(coords1, coords2, P1, P2):
         coords = V[:, V.shape[0]-1]
 
         # Convert to homogenous
-        coords3D[:, i] = coords/coords[3]
+        coords = coords/coords[3]
+
+        coords3D[:, i] = coords
+
+        # Minimise the reprojection error for the caclulated 3D points
+        #x = fmin(reprojection_error, x, xtol=1e-25, ftol=1e-25, full_output=0, args=(
+        #    P1, P2, coords1[0:1,i], coords2[0:1,i]), disp=False)
 
     return coords3D
+
+
+def reprojection_error(coords3D, P1, P2, coords1, coords2):
+    # Project the 3D points to 2D using the calculated projection matrix
+    coords_1 = P1[0:2, :].dot(coords3D) / P1[2, :].dot(coords3D)
+
+    # Calculate the error between the projected point and the actual point coordinates
+    err1 = np.power((coords_1 - coords1), 2)
+
+    coords_2 = P2[0:2, :].dot(coords3D) / P2[2, :].dot(coords3D)
+    err2 = np.power((coords_2 - coords2), 2)
+
+    return sum(err1 + err2)
