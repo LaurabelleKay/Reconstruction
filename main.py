@@ -39,7 +39,6 @@ def main():
     co = coords2
 
     # Normalise our feature coordinates to be in the range [-1, 1]
-    # FIXME: Normalise rows ans columns separately!!!
     coords1 = (coords1 - np.ones(len(coords1[0]))*width)/mm
     coords2 = (coords2 - np.ones(len(coords1[0]))*height)/mm
 
@@ -116,11 +115,6 @@ def main():
                 vals.append(val)
 
         print(val)
-
-        # TODO: Additional match (get add match but also normal matches)
-        # TODO: Calculate P using add matches
-        # TODO: Triangluate other matches using normal triangulation (IF YOU HAVE TIME)
-        # TODO: Bundle adjust (add matches with previous one as well)
 
     fig = plt.figure()
     ax = fig.gca(projection='3d')
